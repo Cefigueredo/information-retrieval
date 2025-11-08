@@ -26,6 +26,8 @@ ALTERNATIVE_FAILED_FILE = OUTPUT_DIR / "alternative_failed.json"
 # API Configuration
 NCBI_API_KEY = os.getenv('NCBI_API_KEY')
 SEMANTIC_SCHOLAR_API_KEY = os.getenv('SEMANTIC_SCHOLAR_API_KEY')
+CORE_API_KEY = os.getenv('CORE_API_KEY')  # Optional
+UNPAYWALL_EMAIL = os.getenv('UNPAYWALL_EMAIL', 'your@email.com')  # Required for Unpaywall
 
 # API URLs
 NCBI_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
@@ -33,6 +35,12 @@ NCBI_EFETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
 EUROPE_PMC_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
 SEMANTIC_SCHOLAR_BASE_URL = "https://api.semanticscholar.org/graph/v1"
 CROSSREF_URL = "https://api.crossref.org/works"
+OPENALEX_URL = "https://api.openalex.org/works"
+ARXIV_URL = "http://export.arxiv.org/api/query"
+BIORXIV_URL = "https://api.biorxiv.org/details/biorxiv"
+MEDRXIV_URL = "https://api.biorxiv.org/details/medrxiv"
+CORE_URL = "https://api.core.ac.uk/v3/search/works"
+UNPAYWALL_URL = "https://api.unpaywall.org/v2"
 
 # Rate Limiting (seconds)
 GENERAL_API_DELAY = 0.5  # For Europe PMC, CrossRef, PubMed

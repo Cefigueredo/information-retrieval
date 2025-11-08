@@ -10,3 +10,11 @@ NCBI_API_KEY=your_ncbi_api_key_here
 # Without API key: 100 requests per 5 minutes
 SEMANTIC_SCHOLAR_API_KEY=your_semantic_scholar_api_key_here
 
+# CORE API Key (Optional - for open access papers)
+# Get your free API key at: https://core.ac.uk/services/api
+CORE_API_KEY=your_core_api_key_here
+
+# Unpaywall Email (Required for Unpaywall API - just needs any valid email)
+# Read more: https://unpaywall.org/products/api
+UNPAYWALL_EMAIL=your_email@example.com
+

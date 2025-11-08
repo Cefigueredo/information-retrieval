@@ -16,28 +16,63 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python run.py main              # Fetch from NCBI PubMed
-  python run.py alternative       # Fetch from alternative sources
-  python run.py --help            # Show this help message
+  python run.py                   # Unified approach (all sources, recommended)
+  python run.py --phases 1        # Only fast APIs
+  python run.py --phases 1 2      # Fast + additional (skip Semantic Scholar)
+  python run.py --fresh           # Ignore existing abstracts
+  
+Legacy modes (still supported):
+  python run.py main              # Old main_request.py (PubMed only)
+  python run.py alternative       # Old alternative_request.py (multi-API)
         """
     )
     
     parser.add_argument(
         'mode',
-        choices=['main', 'alternative', 'alt'],
-        help='Which script to run: "main" for NCBI PubMed, "alternative"/"alt" for multi-API search'
+        nargs='?',
+        choices=['unified', 'main', 'alternative', 'alt'],
+        default='unified',
+        help='Which mode to run (default: unified)'
+    )
+    
+    parser.add_argument(
+        '--phases', '-p',
+        nargs='+',
+        type=int,
+        choices=[1, 2, 3],
+        help='Which phases to use in unified mode'
+    )
+    
+    parser.add_argument(
+        '--fresh',
+        action='store_true',
+        help='Start fresh, ignore existing abstracts'
     )
     
     args = parser.parse_args()
     
-    if args.mode == 'main':
-        print("Running main_request.py (NCBI PubMed)...")
+    if args.mode == 'unified' or args.mode is None:
+        print("Running unified abstract fetcher...")
+        print("=" * 80)
+        from fetch_abstracts import main as fetch_main
+        
+        # Pass arguments to fetch_abstracts
+        sys.argv = ['fetch_abstracts.py']
+        if args.phases:
+            sys.argv.extend(['--phases'] + [str(p) for p in args.phases])
+        if args.fresh:
+            sys.argv.append('--fresh')
+        
+        fetch_main()
+        
+    elif args.mode == 'main':
+        print("Running main_request.py (NCBI PubMed only - legacy)...")
         print("=" * 80)
         from main_request import fetch_relevant_abstracts
         fetch_relevant_abstracts()
         
     elif args.mode in ['alternative', 'alt']:
-        print("Running alternative_request.py (Multi-API)...")
+        print("Running alternative_request.py (Multi-API - legacy)...")
         print("=" * 80)
         from alternative_request import main as alt_main
         alt_main()
