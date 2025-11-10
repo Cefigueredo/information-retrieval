@@ -76,6 +76,9 @@ Legacy modes (still supported):
         print("=" * 80)
         from alternative_request import main as alt_main
         alt_main()
+        
+    from fetch_non_relevant_abstrats import fetch_non_relevant_abstracts
+    fetch_non_relevant_abstracts()
     
     print("\n" + "=" * 80)
     print("Done!")
