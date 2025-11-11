@@ -2,7 +2,7 @@
 
 # NCBI API Key (Required for PubMed requests)
 # Get your free API key at: https://www.ncbi.nlm.nih.gov/account/settings/
-NCBI_API_KEY=your_ncbi_api_key_here
+NCBI_API_KEY=fce6e72e4980962519f91b33aecd3bbac908
 
 # Semantic Scholar API Key (Optional but recommended)
 # Get your free API key at: https://www.semanticscholar.org/product/api
@@ -12,9 +12,9 @@ SEMANTIC_SCHOLAR_API_KEY=your_semantic_scholar_api_key_here
 
 # CORE API Key (Optional - for open access papers)
 # Get your free API key at: https://core.ac.uk/services/api
-CORE_API_KEY=your_core_api_key_here
+CORE_API_KEY=suxqLeaw8pTUI34lzCKXhjtEdDY2RyQO
 
 # Unpaywall Email (Required for Unpaywall API - just needs any valid email)
 # Read more: https://unpaywall.org/products/api
-UNPAYWALL_EMAIL=your_email@example.com
+UNPAYWALL_EMAIL=100472007@alumnos.uc3m.es
 
