@@ -9,12 +9,13 @@ as relevant or non-relevant to polyphenol composition research.
 """
 
 import json
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, average_precision_score, roc_auc_score
 import numpy as np
 from typing import Dict, List, Tuple
 import math
@@ -344,10 +345,11 @@ class TransformerIRSystem:
         print(f"\nTraining completed. Best validation F1: {best_val_f1:.4f}")
     
     def evaluate(self, data_loader: DataLoader) -> Dict[str, float]:
-        """Evaluate the model."""
+        """Evaluate the model on set-based and ranking-based metrics."""
         self.model.eval()
         all_preds = []
         all_labels = []
+        all_scores = []
         
         with torch.no_grad():
             for texts, labels in data_loader:
@@ -355,17 +357,48 @@ class TransformerIRSystem:
                 labels = labels.squeeze()
                 
                 outputs = self.model(texts)
-                preds = torch.argmax(outputs, dim=1).cpu().numpy()
+
+                # Scores for ranking metrics (probability of relevant class)
+                scores = torch.softmax(outputs, dim=1)[:, 1].cpu().numpy()
+                all_scores.extend(scores)
                 
+                # Predictions for set-based metrics
+                preds = torch.argmax(outputs, dim=1).cpu().numpy()
                 all_preds.extend(preds)
                 all_labels.extend(labels.numpy())
         
+        # Set-based metrics
         metrics = {
             'accuracy': accuracy_score(all_labels, all_preds),
             'precision': precision_score(all_labels, all_preds, zero_division=0),
             'recall': recall_score(all_labels, all_preds, zero_division=0),
             'f1': f1_score(all_labels, all_preds, zero_division=0)
         }
+        
+        # Ranking-based metrics
+        if len(np.unique(all_labels)) > 1:
+            metrics['ap'] = average_precision_score(all_labels, all_scores)
+            metrics['roc_auc'] = roc_auc_score(all_labels, all_scores)
+
+            # Combine scores and labels and sort for P@X and R-Precision
+            results = sorted(zip(all_scores, all_labels), key=lambda x: x[0], reverse=True)
+            sorted_labels = [label for score, label in results]
+
+            # R-Precision
+            R = sum(all_labels)
+            if R > 0:
+                top_R_labels = sorted_labels[:R]
+                metrics['r_precision'] = sum(top_R_labels) / R
+            else:
+                metrics['r_precision'] = 0.0
+
+            # P@10
+            X = 10
+            if X > 0:
+                top_X_labels = sorted_labels[:X]
+                metrics['p_at_10'] = sum(top_X_labels) / X
+            else:
+                metrics['p_at_10'] = 0.0
         
         return metrics
     
@@ -421,6 +454,8 @@ class TransformerIRSystem:
 
 def main():
     """Main execution function."""
+    model_path = 'transformer_ir_model.pth'
+
     # Initialize system
     ir_system = TransformerIRSystem(
         max_vocab_size=10000,
@@ -429,51 +464,125 @@ def main():
         num_layers=3,
         max_seq_length=256
     )
-    
-    # Load data
-    print("Loading data...")
-    relevant_texts, non_relevant_texts = ir_system.load_data(
-        'data/output/alternative_abstracts.json',
-        'data/output/non_relevant_abstracts.json'
-    )
-    
-    # Prepare datasets
-    print("\nPreparing datasets...")
-    train_dataset, val_dataset, test_dataset = ir_system.prepare_datasets(
-        relevant_texts, non_relevant_texts
-    )
-    
-    # Train model
-    print("\nTraining model...")
-    ir_system.train(
-        train_dataset,
-        val_dataset,
-        batch_size=32,
-        epochs=15,
-        lr=0.001
-    )
-    
-    # Evaluate on test set
-    print("\nEvaluating on test set...")
-    test_loader = DataLoader(test_dataset, batch_size=32)
-    test_metrics = ir_system.evaluate(test_loader)
-    
-    print("\n=== Test Set Results ===")
-    print(f"Accuracy:  {test_metrics['accuracy']:.4f}")
-    print(f"Precision: {test_metrics['precision']:.4f}")
-    print(f"Recall:    {test_metrics['recall']:.4f}")
-    print(f"F1-Score:  {test_metrics['f1']:.4f}")
-    
-    # Save model
-    ir_system.save_model('transformer_ir_model.pth')
-    
-    # Example prediction
-    print("\n=== Example Prediction ===")
-    example_text = "Polyphenol composition and antioxidant activity in strawberry purees"
-    pred, conf = ir_system.predict(example_text)
-    print(f"Text: {example_text}")
-    print(f"Prediction: {'Relevant' if pred == 1 else 'Non-relevant'}")
-    print(f"Confidence: {conf:.4f}")
+
+    if os.path.exists(model_path):
+        print(f"Found existing model at '{model_path}'. Loading and evaluating.")
+        ir_system.load_model(model_path)
+
+        # Load data for evaluation
+        print("Loading data for evaluation...")
+        relevant_texts, non_relevant_texts = ir_system.load_data(
+            'data/output/alternative_abstracts.json',
+            'data/output/non_relevant_abstracts.json'
+        )
+        all_data = relevant_texts + non_relevant_texts
+
+        # We need a test set. Let's follow the split logic from prepare_datasets.
+        train_size = 0.7
+        val_size = 0.15
+        
+        # First split: train and temp (val + test)
+        _, temp_data = train_test_split(
+            all_data, train_size=train_size, random_state=42, stratify=[x[1] for x in all_data]
+        )
+        
+        # Second split: validation and test
+        val_ratio = val_size / (1 - train_size)
+        _, test_data = train_test_split(
+            temp_data, train_size=val_ratio, random_state=42, stratify=[x[1] for x in temp_data]
+        )
+
+        print(f"Test set size: {len(test_data)}")
+
+        # Create test dataset with the loaded preprocessor
+        test_dataset = PolyphenolDataset(test_data, ir_system.preprocessor, ir_system.max_seq_length)
+
+        # Evaluate on test set
+        print("\nEvaluating on test set...")
+        test_loader = DataLoader(test_dataset, batch_size=32)
+        test_metrics = ir_system.evaluate(test_loader)
+        
+        print("\n=== Test Set Results ===")
+        print("--- Set-based Metrics ---")
+        print(f"Accuracy:  {test_metrics['accuracy']:.4f}")
+        print(f"Precision: {test_metrics['precision']:.4f}")
+        print(f"Recall:    {test_metrics['recall']:.4f}")
+        print(f"F1-Score:  {test_metrics['f1']:.4f}")
+        
+        if 'ap' in test_metrics:
+            print("\n--- Ranking-based Metrics ---")
+            print(f"Average Precision (AP): {test_metrics['ap']:.4f}")
+            print(f"ROC-AUC:                {test_metrics['roc_auc']:.4f}")
+            if 'r_precision' in test_metrics:
+                print(f"R-Precision:            {test_metrics['r_precision']:.4f}")
+            if 'p_at_10' in test_metrics:
+                print(f"Precision@10:           {test_metrics['p_at_10']:.4f}")
+        
+        # Example prediction
+        print("\n=== Example Prediction ===")
+        example_text = "Polyphenol composition and antioxidant activity in strawberry purees"
+        pred, conf = ir_system.predict(example_text)
+        print(f"Text: {example_text}")
+        print(f"Prediction: {'Relevant' if pred == 1 else 'Non-relevant'}")
+        print(f"Confidence: {conf:.4f}")
+
+    else:
+        print("No existing model found. Starting training process.")
+        # Original flow
+        # Load data
+        print("Loading data...")
+        relevant_texts, non_relevant_texts = ir_system.load_data(
+            'data/output/alternative_abstracts.json',
+            'data/output/non_relevant_abstracts.json'
+        )
+        
+        # Prepare datasets
+        print("\nPreparing datasets...")
+        train_dataset, val_dataset, test_dataset = ir_system.prepare_datasets(
+            relevant_texts, non_relevant_texts
+        )
+        
+        # Train model
+        print("\nTraining model...")
+        ir_system.train(
+            train_dataset,
+            val_dataset,
+            batch_size=32,
+            epochs=15,
+            lr=0.001
+        )
+        
+        # Evaluate on test set
+        print("\nEvaluating on test set...")
+        test_loader = DataLoader(test_dataset, batch_size=32)
+        test_metrics = ir_system.evaluate(test_loader)
+        
+        print("\n=== Test Set Results ===")
+        print("--- Set-based Metrics ---")
+        print(f"Accuracy:  {test_metrics['accuracy']:.4f}")
+        print(f"Precision: {test_metrics['precision']:.4f}")
+        print(f"Recall:    {test_metrics['recall']:.4f}")
+        print(f"F1-Score:  {test_metrics['f1']:.4f}")
+        
+        if 'ap' in test_metrics:
+            print("\n--- Ranking-based Metrics ---")
+            print(f"Average Precision (AP): {test_metrics['ap']:.4f}")
+            print(f"ROC-AUC:                {test_metrics['roc_auc']:.4f}")
+            if 'r_precision' in test_metrics:
+                print(f"R-Precision:            {test_metrics['r_precision']:.4f}")
+            if 'p_at_10' in test_metrics:
+                print(f"Precision@10:           {test_metrics['p_at_10']:.4f}")
+        
+        # Save model
+        ir_system.save_model(model_path)
+        
+        # Example prediction
+        print("\n=== Example Prediction ===")
+        example_text = "Polyphenol composition and antioxidant activity in strawberry purees"
+        pred, conf = ir_system.predict(example_text)
+        print(f"Text: {example_text}")
+        print(f"Prediction: {'Relevant' if pred == 1 else 'Non-relevant'}")
+        print(f"Confidence: {conf:.4f}")
 
 
 if __name__ == "__main__":
