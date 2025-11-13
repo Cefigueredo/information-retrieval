@@ -168,3 +168,57 @@ class MyNewSourceFetcher(AbstractFetcher):
 
 2. Add to `abstract_retriever.py` in appropriate phase
 3. Done!
+
+### Verifying Your Data
+
+Before training, use the inspection utility to verify your data:
+
+```bash
+python inspect_data.py
+```
+
+This will show you:
+- Number of documents in each file
+- Document structure and fields
+- Text length statistics
+- Sample documents
+- Dataset balance
+- Most common words
+
+---
+
+## Usage
+
+### Basic Training and Evaluation
+
+```bash
+python transformer_encoder.py
+```
+
+This will:
+1. Load data from `relevant_documents.json` and `non_relevant_documents.json`
+2. Split into train (70%), validation (15%), test (15%)
+3. Build vocabulary from training data
+4. Check if there is any model already trained or train the Transformer Encoder for 15 epochs
+5. Evaluate on the test set
+6. Save the trained model to `transformer_ir_model.pth`
+
+### Inference utilities
+
+If you want to check the predictions with any custom text that you want to input to the model, you can do:
+
+```bash
+python inference.py
+```
+
+This way you can check the confidence on any text input that you use and check if the predictions are okay!
+
+### Evaluation Visualized
+
+If you want to check the evaluation metrics in a visual way, just run:
+
+```bash
+python visualizations.py
+```
+All the images containing the different evaluations will be stored in a folder called figures.
+

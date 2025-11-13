@@ -113,7 +113,7 @@ This will show you:
 ### Basic Training and Evaluation
 
 ```bash
-python transformer_ir_system.py
+python transformer_encoder.py
 ```
 
 This will:
